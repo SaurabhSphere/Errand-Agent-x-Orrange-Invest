@@ -1,6 +1,34 @@
 # Errand Agent — Founding AI Engineer Assignment
 
+[![Eval Status](https://img.shields.io/badge/Evals-18%2F18%20Passed-brightgreen)](EVAL_TABLE.md)
+[![Tests](https://img.shields.io/badge/Tests-58%20Passed-success)](tests/)
+[![Demo Video](https://img.shields.io/badge/Demo-Loom%20Video-blue)](https://www.loom.com/share/121adfbffadd4206adb4f091d447a62e)
+
 Autonomous home-service chat agent that books, reschedules, and cancels errands against a mocked provider API — enforcing code-level approval gates, idempotency, prompt-injection containment, and cross-session memory.
+
+---
+
+## 🎥 Demo Video (Loom)
+
+▶️ **Watch the Walkthrough**: **[https://www.loom.com/share/121adfbffadd4206adb4f091d447a62e](https://www.loom.com/share/121adfbffadd4206adb4f091d447a62e)**
+
+### Video Walkthrough Highlights
+1. **Introduction & LangGraph State Architecture**: Explicit state transitions, typed state schema, and interrupt gates (`interrupt_before=["execute_booking", ...]`).
+2. **Happy-Path Booking & Code-Enforced Approval**: Selective slot gathering, slot holding, immutable approval record presentation, and verified execution.
+3. **Live Failure Handling & Invariant Enforcement**:
+   - **Prompt Injection Resistance**: Provider review containing `SYSTEM OVERRIDE` is sanitized and quarantined as passive data; code-level approval gate prevents autonomous execution.
+   - **Timeout-After-Success Recovery**: Catching booking timeout, avoiding duplicate billing/booking, querying authoritative `get_booking_status`, and verifying state.
+4. **Side-by-Side Trace Inspection**: Inspection of the committed JSONL trace ([`traces/trace-timeout-after-success-demo.jsonl`](traces/trace-timeout-after-success-demo.jsonl)) with timestamps, tool call parameters, and scrubbed secrets.
+
+---
+
+## 📑 Assignment Deliverables Quick Links
+
+* 📖 **Design Note (Max 2 pages)**: [`DESIGN.md`](DESIGN.md) (Architecture, Code Gates, Recovery, Memory, 100× Scale Bottlenecks)
+* 📊 **Automated Eval Table**: [`EVAL_TABLE.md`](EVAL_TABLE.md) (18/18 Scenarios Passed, dynamically generated)
+* 🐛 **Three Real Bugs Encountered**: [`BUGS.md`](BUGS.md) (Root causes, architectural fixes, and regression tests)
+* 📜 **Raw E2E Trace**: [`traces/trace-timeout-after-success-demo.jsonl`](traces/trace-timeout-after-success-demo.jsonl)
+* 🎥 **Recorded Demo**: [Loom Video Walkthrough](https://www.loom.com/share/121adfbffadd4206adb4f091d447a62e)
 
 ---
 
@@ -72,14 +100,3 @@ pytest tests/ -v
 ├── EVAL_TABLE.md              # Dynamically generated 18-scenario eval table
 └── requirements.txt           # Project dependencies
 ```
-
----
-
-## 🎥 Demo Video Outline (3–5 min)
-
-1. **Introduction (30s)**: High-level overview of LangGraph architecture and code-level approval gates.
-2. **Happy-path booking (1 min)**: User specifies service, area, budget; agent holds slot, displays approval prompt, and books upon confirmation.
-3. **Live failure handling (1.5 min)**:
-   - **Prompt Injection**: Show provider review containing `SYSTEM OVERRIDE` — demonstrate that agent treats it purely as text without granting approval.
-   - **Timeout-After-Success**: Show agent executing booking, catching backend timeout, querying `get_booking_status`, and reporting verified booking without double-booking.
-4. **Side-by-side Trace View (1 min)**: Show the corresponding JSONL trace in `traces/` highlighting state transitions, tool call timestamps, and approval verification logs.

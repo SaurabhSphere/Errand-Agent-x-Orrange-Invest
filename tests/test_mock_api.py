@@ -123,3 +123,11 @@ def test_reschedule_conflict():
     res = api.reschedule(booking_id, "2026-11-07T10:00", idempotency_key="resched-02")
     assert res["status"] == "updated"
     assert res["new_slot"] == "2026-11-07T10:00"
+def test_search_providers_strict_service_isolation_for_all_categories():
+    api = MockProviderAPI()
+    categories = ['cleaning', 'plumbing', 'electrician', 'ac_servicing']
+    for cat in categories:
+        providers = api.search_providers(service=cat, area="koramangala")
+        assert len(providers) >= 3, f'Expected >= 3 providers for {cat}, got {len(providers)}'
+        services = {p['service'] for p in providers}
+        assert services == {cat}, f'Strict service isolation violated for {cat}: got {services}'

@@ -64,37 +64,41 @@ class MockProviderAPI:
         area: str,
         date_range: tuple[str, str] | list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """Search for providers matching service and area. Returns 3-8 providers."""
+        """Search for providers strictly matching the requested service and area."""
         service_clean = service.lower().strip().replace(" ", "_")
-        area_clean = area.lower().strip()
+        area_clean = area.lower().strip() if area else ""
 
+        # Normalize service category to one of the platform trades
+        if any(w in service_clean for w in ["plumb", "tap", "pipe", "leak", "sink", "drain"]):
+            target_service = "plumbing"
+        elif any(w in service_clean for w in ["electr", "wiring", "switch", "fan", "light"]):
+            target_service = "electrician"
+        elif any(w in service_clean for w in ["ac", "air condition", "cooling"]):
+            target_service = "ac_servicing"
+        elif any(w in service_clean for w in ["clean", "housekeeping", "maid", "dusting"]):
+            target_service = "cleaning"
+        else:
+            target_service = service_clean
+
+        # 1. Primary match: strictly match service AND area
         matched = []
         for p in self._providers.values():
-            p_service = p["service"].lower().replace(" ", "_")
-            p_area = p["area"].lower()
-
-            # Flexible match for service & area
-            service_match = (
-                service_clean in p_service
-                or p_service in service_clean
-                or ("plumb" in service_clean and "plumb" in p_service)
-                or ("electr" in service_clean and "electr" in p_service)
-                or ("ac" in service_clean and "ac" in p_service)
-                or ("clean" in service_clean and "clean" in p_service)
-            )
-            area_match = area_clean in p_area or p_area in area_clean or not area_clean
-
-            if service_match and area_match:
-                matched.append(copy.deepcopy(p))
-
-        # If strict match yields fewer than 3, fall back to matching service anywhere
-        if len(matched) < 3:
-            for p in self._providers.values():
-                if p not in matched and ("plumb" in service_clean and "plumb" in p["service"]):
+            if p["service"] == target_service:
+                p_area = p["area"].lower()
+                if not area_clean or area_clean in p_area or p_area in area_clean:
                     matched.append(copy.deepcopy(p))
 
-        # Always return between 3 and 8 providers
-        return matched[:8] if len(matched) >= 3 else list(self._providers.values())[:5]
+        # 2. If fewer than 3 providers match the specific locality, expand to the SAME SERVICE in all areas
+        if len(matched) < 3:
+            for p in self._providers.values():
+                if p["service"] == target_service and not any(m["id"] == p["id"] for m in matched):
+                    matched.append(copy.deepcopy(p))
+
+        # Sort by rating descending then price ascending
+        matched.sort(key=lambda p: (-p.get("rating", 0), p.get("price", 99999)))
+
+        # Return between 3 and 8 matching providers of the requested service
+        return matched[:8]
 
     def get_provider(self, provider_id: str) -> dict[str, Any]:
         """Fetch provider details and free-text reviews."""

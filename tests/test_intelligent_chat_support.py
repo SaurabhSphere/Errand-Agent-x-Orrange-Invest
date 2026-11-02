@@ -135,3 +135,17 @@ async def test_approval_gate_preserved_after_chat_support_inquiries(temp_memory_
     confirmation = await agent.step("yes")
     assert "Success" in confirmation
     assert len(api.list_bookings("user_default")) == 3  # Now booked!
+@pytest.mark.asyncio
+async def test_cleaning_service_request_returns_only_cleaners(temp_memory_store, temp_tracer):
+    api = MockProviderAPI()
+    agent = ErrandAgent(api=api, memory_manager=temp_memory_store, tracer=temp_tracer)
+
+    r1 = await agent.step('cleaning')
+    assert 'area' in r1.lower() or 'locality' in r1.lower()
+
+    res = await agent.step('koramangala')
+    assert 'matching provider' in res.lower()
+    assert any(name in res for name in ['SparkleClean', 'UrbanMaid', 'EcoClean', 'QuickShine'])
+    assert 'Rajesh Kumar Plumbing' not in res
+    assert 'Vikram Premium Plumbers' not in res
+    assert 'Amit Electrical Works' not in res

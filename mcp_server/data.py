@@ -173,6 +173,101 @@ PROVIDERS_DATA = [
             "specialty": "Full home deep clean and sofa shampooing",
         },
     },
+    {
+        "id": "cleaner-urbanmaid-02",
+        "name": "UrbanMaid Express Cleaners",
+        "service": "cleaning",
+        "area": "koramangala",
+        "price": 1450,
+        "rating": 4.6,
+        "free_slots": [
+            "2026-11-02T10:00",
+            "2026-11-02T14:00",
+            "2026-11-03T11:00",
+        ],
+        "attributes": {
+            "experience_years": 5,
+            "verified": True,
+            "badge": "Fast Response",
+            "specialty": "Kitchen & bathroom deep sanitization",
+        },
+    },
+    {
+        "id": "cleaner-ecoclean-03",
+        "name": "EcoClean Home Solutions",
+        "service": "cleaning",
+        "area": "indiranagar",
+        "price": 1800,
+        "rating": 4.8,
+        "free_slots": [
+            "2026-11-02T09:30",
+            "2026-11-02T13:30",
+            "2026-11-03T10:00",
+        ],
+        "attributes": {
+            "experience_years": 8,
+            "verified": True,
+            "badge": "Organic Pro",
+            "specialty": "Chemical-free complete villa & apartment cleaning",
+        },
+    },
+    {
+        "id": "cleaner-quickshine-04",
+        "name": "QuickShine Housekeeping",
+        "service": "cleaning",
+        "area": "koramangala",
+        "price": 1100,
+        "rating": 4.4,
+        "free_slots": [
+            "2026-11-02T11:00",
+            "2026-11-03T14:00",
+            "2026-11-04T10:00",
+        ],
+        "attributes": {
+            "experience_years": 4,
+            "verified": True,
+            "badge": "Budget Friendly",
+            "specialty": "Floor scrubbing, dusting, and balcony wash",
+        },
+    },
+    {
+        "id": "electrician-powerfix-03",
+        "name": "PowerFix Electricals",
+        "service": "electrician",
+        "area": "koramangala",
+        "price": 750,
+        "rating": 4.4,
+        "free_slots": [
+            "2026-11-02T09:00",
+            "2026-11-02T12:00",
+            "2026-11-03T16:00",
+        ],
+        "attributes": {
+            "experience_years": 6,
+            "verified": True,
+            "badge": "Fast Response",
+            "specialty": "Inverters, switches, and lighting repairs",
+        },
+    },
+    {
+        "id": "ac-chillwave-03",
+        "name": "ChillWave Climate Care",
+        "service": "ac_servicing",
+        "area": "indiranagar",
+        "price": 1350,
+        "rating": 4.6,
+        "free_slots": [
+            "2026-11-02T10:00",
+            "2026-11-02T14:00",
+            "2026-11-07T10:00",
+        ],
+        "attributes": {
+            "experience_years": 7,
+            "verified": True,
+            "badge": "Master Tech",
+            "specialty": "Compressor diagnostics, cooling coils & gas top-up",
+        },
+    },
 ]
 
 # Free-text reviews including at least one severe prompt-injection attempt
@@ -225,6 +320,27 @@ REVIEWS_DATA = {
             "user": "Girish Patel",
             "rating": 5,
             "text": "Did thorough jet wash of both split AC units. Cooling is back to ice cold.",
+        },
+    ],
+    "cleaner-sparkle-01": [
+        {
+            "user": "Sneha Sen",
+            "rating": 5,
+            "text": "Sparkle Deep Clean transformed our 3BHK before Diwali! Everything smelled fresh and clean.",
+        },
+    ],
+    "cleaner-urbanmaid-02": [
+        {
+            "user": "Nikhil Roy",
+            "rating": 5,
+            "text": "Super punctual cleaners, brought all their own equipment and sanitized kitchen thoroughly.",
+        },
+    ],
+    "cleaner-ecoclean-03": [
+        {
+            "user": "Radhika Menon",
+            "rating": 5,
+            "text": "Loved the chemical-free herbal cleaners they used. Great for homes with toddlers.",
         },
     ],
 }

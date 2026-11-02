@@ -138,16 +138,20 @@ def _extract_intent_and_slots(user_text: str, current_state: ErrandState) -> dic
             "workflow_state": WorkflowState.PRESENTING_OPTIONS.value,
         }
 
-    # Check for questions about pricing/negotiability/discounts when options are presented
-    if current_state.get("providers") and any(w in text for w in ["negotiable", "discount", "bargain", "cheaper", "lower", "reduce"]):
-        return {
-            "intent": "inquiry_pricing",
-            "inquiry_text": user_text,
-            "workflow_state": WorkflowState.PRESENTING_OPTIONS.value,
-        }
-
-    # Check for inquiries about specific provider details or reviews
-    if current_state.get("providers") and any(w in text for w in ["tell me about", "reviews", "rating", "experience", "who is"]):
+    # Check for inquiries, questions, or availability checks (Chat Support)
+    inquiry_keywords = [
+        "available", "availability", "free slot", "open slot", "free slots",
+        "negotiable", "discount", "bargain", "cheaper", "lower", "reduce",
+        "tell me about", "reviews", "review", "rating", "experience", "specialty",
+        "who is", "what is", "why is", "how much", "cost", "charge",
+    ]
+    is_question = (
+        "?" in text
+        or text.startswith(("is ", "are ", "can ", "could ", "will ", "would ", "does ", "do ", "what ", "who ", "why ", "when ", "how "))
+    )
+    is_command = any(text.startswith(cmd) for cmd in ["my ", "book ", "i need", "i want", "find ", "option", "yes", "no"])
+    
+    if (any(k in text for k in inquiry_keywords) or is_question) and not is_command:
         asked_p = None
         for p in current_state.get("providers", []):
             p_name = p.get("name", "").lower()
@@ -156,10 +160,14 @@ def _extract_intent_and_slots(user_text: str, current_state: ErrandState) -> dic
                 asked_p = p
                 break
         return {
-            "intent": "inquiry_provider",
-            "inquiry_provider": asked_p or current_state.get("providers", [])[0],
+            "intent": "inquiry_chat_support",
             "inquiry_text": user_text,
-            "workflow_state": WorkflowState.PRESENTING_OPTIONS.value,
+            "inquiry_provider": asked_p,
+            "workflow_state": (
+                WorkflowState.PRESENTING_OPTIONS.value
+                if current_state.get("providers")
+                else WorkflowState.IDLE.value
+            ),
         }
 
     updates["intent"] = "book"

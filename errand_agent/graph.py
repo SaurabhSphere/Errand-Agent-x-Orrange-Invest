@@ -30,6 +30,7 @@ def build_errand_graph(
     memory_manager: MemoryManager | None = None,
     tracer: Tracer | None = None,
     checkpointer: BaseCheckpointSaver | None = None,
+    chat_engine: Any | None = None,
 ) -> Any:
     """Construct and compile the full Errand Agent LangGraph StateGraph."""
 
@@ -173,6 +174,27 @@ def build_errand_graph(
             "messages": [AIMessage(content=msg)],
         }
 
+    def node_chat_support_inquiry(state: ErrandState) -> dict[str, Any]:
+        messages = state.get("messages", [])
+        last_msg = messages[-1] if messages else ""
+        user_text = last_msg.content if hasattr(last_msg, "content") else str(last_msg)
+        user_id = state.get("user_id", "user_default")
+
+        if chat_engine:
+            answer = chat_engine.answer_inquiry(user_text, state, user_id=user_id)
+        else:
+            answer = "I can assist you with provider details, availability, and bookings. How can I help?"
+
+        wf_state = (
+            WorkflowState.PRESENTING_OPTIONS.value
+            if state.get("providers")
+            else WorkflowState.IDLE.value
+        )
+        return {
+            "workflow_state": wf_state,
+            "messages": [AIMessage(content=answer)],
+        }
+
     # 2. Add nodes to graph
     builder.add_node("route_intent", node_route_intent)
     builder.add_node("gather_info", node_gather_info)
@@ -190,6 +212,7 @@ def build_errand_graph(
     builder.add_node("inquiry_pricing", node_inquiry_pricing)
     builder.add_node("invalid_selection", node_invalid_selection)
     builder.add_node("inquiry_provider", node_inquiry_provider)
+    builder.add_node("chat_support_inquiry", node_chat_support_inquiry)
 
     # 3. Add Edges & Conditional Routing
     builder.add_edge(START, "route_intent")
@@ -197,7 +220,8 @@ def build_errand_graph(
     def route_after_intent(state: ErrandState) -> Literal[
         "gather_info", "hold_slot", "await_approval",
         "list_bookings", "memory_view", "memory_forget",
-        "inquiry_pricing", "invalid_selection", "inquiry_provider"
+        "inquiry_pricing", "invalid_selection", "inquiry_provider",
+        "chat_support_inquiry"
     ]:
         intent = state.get("intent")
         if intent == "memory_view":
@@ -210,6 +234,8 @@ def build_errand_graph(
             return "await_approval"
         elif intent == "select_provider":
             return "hold_slot"
+        elif intent == "inquiry_chat_support":
+            return "chat_support_inquiry"
         elif intent == "inquiry_pricing":
             return "inquiry_pricing"
         elif intent == "invalid_selection":
@@ -289,6 +315,7 @@ def build_errand_graph(
     builder.add_edge("inquiry_pricing", END)
     builder.add_edge("invalid_selection", END)
     builder.add_edge("inquiry_provider", END)
+    builder.add_edge("chat_support_inquiry", END)
 
     # 4. Compile with checkpointer and human-in-the-loop interrupts (MUST-HAVE 2)
     checkpointer_inst = checkpointer or MemorySaver()

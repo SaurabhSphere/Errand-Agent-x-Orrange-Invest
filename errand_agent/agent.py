@@ -9,6 +9,7 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from mcp_server.provider_api import MockProviderAPI
 from errand_agent.approval import ApprovalController, ApprovalDeclinedError, NoApprovalPendingError
+from errand_agent.chat_engine import ChatSupportEngine
 from errand_agent.graph import build_errand_graph
 from errand_agent.jev_guardrail import JEVGuardrail
 from errand_agent.memory import MemoryManager
@@ -47,6 +48,7 @@ class ErrandAgent:
         self.user_id = user_id
         self.thread_id = thread_id
         self.guardrail = JEVGuardrail()
+        self.chat_engine = ChatSupportEngine(api=self.api, memory_manager=self.memory)
 
         # Compile the LangGraph
         self.graph = build_errand_graph(
@@ -55,6 +57,7 @@ class ErrandAgent:
             memory_manager=self.memory,
             tracer=self.tracer,
             checkpointer=self.checkpointer,
+            chat_engine=self.chat_engine,
         )
 
         self.config = {

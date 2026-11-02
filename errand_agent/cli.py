@@ -34,6 +34,12 @@ async def main() -> None:
     memory = MemoryManager()
     agent = ErrandAgent(api=api, memory_manager=memory, tracer=tracer)
 
+    mode_desc = (
+        "OpenAI gpt-4o-mini (Live Intelligent Chat Support)"
+        if agent.chat_engine.is_llm_active()
+        else "Deterministic Engine (Offline Mode)"
+    )
+    print(f"🤖 Chat Support Engine: {mode_desc}")
     print(f"📊 Active Trace File: {tracer.trace_file}\n")
     print("Agent: Hello! I can book, reschedule, or cancel home services for you. How can I help today?\n")
 

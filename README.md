@@ -46,26 +46,29 @@ pytest tests/ -v
 │   ├── graph.py               # LangGraph StateGraph with interrupt gates
 │   ├── approval.py            # Code-enforced ApprovalController
 │   ├── memory.py              # Cross-session memory with fact provenance
+│   ├── jev_guardrail.py       # TypeSafe AI Jev guardrail for jailbreak defense
 │   ├── sanitizer.py           # Untrusted tool output sanitizer
 │   ├── tracer.py              # Structured JSONL trace recorder
 │   ├── state.py               # Workflow state TypedDict schema
 │   ├── models.py              # Pydantic domain models
-│   └── nodes/                 # 10 StateGraph workflow nodes
+│   └── nodes/                 # StateGraph workflow nodes (routing, search, inquiry, etc.)
 ├── mcp_server/                # Mock Provider API & FastMCP tool server
 │   ├── server.py              # FastMCP server exposing 8 tools
 │   ├── provider_api.py        # Mock implementation of all 8 tools
 │   ├── tool_adapter.py        # LangChain tool bindings
 │   ├── scenarios.py           # Configurable failure scenarios
 │   └── data.py                # Seed providers & prompt-injection reviews
-├── tests/                     # Test suite
+├── tests/                     # Test suite (44 unit & eval tests)
 │   ├── test_evals.py          # 18 automated eval scenarios
 │   ├── eval_report.py         # Markdown eval report generator
+│   ├── test_conversational_resilience.py # Recovery & inquiry tests
+│   ├── test_jev_guardrail.py  # JEV guardrail & jailbreak tests
 │   ├── test_mock_api.py       # Unit tests for mock API
 │   ├── test_security_and_approval.py  # Unit tests for approval & sanitizer
 │   └── test_memory_and_tracer.py      # Unit tests for memory & tracer
 ├── traces/                    # Audit logs (e.g. trace-timeout-after-success-demo.jsonl)
 ├── DESIGN.md                  # 2-page design note & 100x scale analysis
-├── BUGS.md                    # 3 real bugs encountered, root causes & fixes
+├── BUGS.md                    # Real bugs encountered, root causes & fixes
 ├── EVAL_TABLE.md              # Dynamically generated 18-scenario eval table
 └── requirements.txt           # Project dependencies
 ```

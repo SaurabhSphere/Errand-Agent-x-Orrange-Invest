@@ -6,3 +6,5 @@ pydantic>=2.10.0
 pytest>=8.0.0
 pytest-asyncio>=1.4.0
 langgraph-checkpoint-sqlite>=3.1.0
+typesafe-sdk>=0.7.0
+python-dotenv>=1.0.0

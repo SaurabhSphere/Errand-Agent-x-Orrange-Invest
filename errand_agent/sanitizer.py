@@ -30,7 +30,15 @@ class Sanitizer:
         """Return True if text contains known injection / override patterns."""
         if not isinstance(text, str):
             return False
-        return any(pattern.search(text) for pattern in cls.INJECTION_PATTERNS)
+        if any(pattern.search(text) for pattern in cls.INJECTION_PATTERNS):
+            return True
+        try:
+            from errand_agent.jev_guardrail import JEVGuardrail
+            guard = JEVGuardrail()
+            res = guard.check_input(text)
+            return res.blocked
+        except Exception:
+            return False
 
     @classmethod
     def sanitize_text(cls, text: str) -> str:

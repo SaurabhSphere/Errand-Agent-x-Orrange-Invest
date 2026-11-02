@@ -33,6 +33,10 @@ traces/
 *.sqlite
 *.sqlite3
 
+# Environment & Keys
+.env
+.env.local
+
 # Testing & Artifacts
 .pytest_cache/
 .coverage

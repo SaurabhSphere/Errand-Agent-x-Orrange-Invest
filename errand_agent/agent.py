@@ -10,6 +10,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from mcp_server.provider_api import MockProviderAPI
 from errand_agent.approval import ApprovalController, ApprovalDeclinedError, NoApprovalPendingError
 from errand_agent.graph import build_errand_graph
+from errand_agent.jev_guardrail import JEVGuardrail
 from errand_agent.memory import MemoryManager
 from errand_agent.models import ExecutionLimits, MemorySource, WorkflowState
 from errand_agent.tracer import Tracer
@@ -45,6 +46,7 @@ class ErrandAgent:
         self.limits = limits or ExecutionLimits()
         self.user_id = user_id
         self.thread_id = thread_id
+        self.guardrail = JEVGuardrail()
 
         # Compile the LangGraph
         self.graph = build_errand_graph(
@@ -74,6 +76,21 @@ class ErrandAgent:
 
     async def step(self, user_input: str) -> str:
         """Execute one conversational step, checking execution limits and approval state."""
+        # 0. JEV Safety Guardrail (Jailbreak and Prompt Injection Screening)
+        guard_decision = self.guardrail.check_input(user_input)
+        if guard_decision.blocked:
+            self.tracer.record(
+                "guardrail_blocked",
+                input=user_input,
+                reason=guard_decision.reason,
+                source=guard_decision.source,
+            )
+            return (
+                f"🛡️ Guardrail Alert: Your message was flagged by the JEV safety guardrail as a potential "
+                f"system prompt injection or jailbreak attempt ({guard_decision.reason}). "
+                f"This request has been blocked to ensure agent security."
+            )
+
         # 1. Bounded Execution Guard (Must-Have 5)
         within_limits, reason = self.limits.check_limits()
         if not within_limits:

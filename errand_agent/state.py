@@ -24,6 +24,8 @@ class ErrandState(TypedDict, total=False):
     date_range_end: str | None
     time_preference: str | None
     budget_max: int | None
+    budget_exceeded: bool | None
+    closest_budget_provider: dict[str, Any] | None
     preferred_provider_id: str | None
 
     # Track provenance of collected slot fields: "user_stated" | "agent_inferred"

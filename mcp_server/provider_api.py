@@ -94,6 +94,15 @@ class MockProviderAPI:
                 if p["service"] == target_service and not any(m["id"] == p["id"] for m in matched):
                     matched.append(copy.deepcopy(p))
 
+        # If date_range specified, filter free_slots to that date range
+        if date_range:
+            start_d, end_d = date_range
+            for p in matched:
+                p["free_slots"] = [
+                    s for s in p.get("free_slots", [])
+                    if (not start_d or s[:10] >= start_d) and (not end_d or s[:10] <= end_d)
+                ]
+
         # Sort by rating descending then price ascending
         matched.sort(key=lambda p: (-p.get("rating", 0), p.get("price", 99999)))
 

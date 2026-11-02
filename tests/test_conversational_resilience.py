@@ -75,3 +75,51 @@ async def test_guardrail_evaluated_before_limits(temp_memory_store, temp_tracer)
     # Invariant: JEV Guardrail fires first! Security is not masked by wall-clock timeout
     assert "Guardrail Alert" in res
     assert "JEV safety guardrail" in res
+@pytest.mark.asyncio
+async def test_budget_exceeded_reports_transparent_fallback_and_closest_option(temp_memory_store, temp_tracer):
+    """When budget constraint has zero exact matches, agent must never claim matches,
+
+    must report the gap, and must rank alternatives in price ascending order.
+    """
+    api = MockProviderAPI()
+    agent = ErrandAgent(api=api, memory_manager=temp_memory_store, tracer=temp_tracer)
+
+    # 1. Slot gathering: prompts for area if missing
+    r1 = await agent.step("i want to boook a cleaner for tomorrow morning under 1000")
+    assert "area/locality" in r1
+
+    # 2. Once area is provided, search runs with all preserved constraints
+    res = await agent.step("Koramangala")
+
+    # Invariants:
+    # 1. Never falsely claims "I found 3 matching provider(s)"
+    assert "I found 3 matching provider(s):" not in res
+    # 2. Transparently reports budget gap
+    assert "No cleaning providers found under ₹1000" in res
+    assert "QuickShine Housekeeping" in res
+    assert "1100" in res
+    # 3. Sorted by price ascending: QuickShine (₹1100) must appear as Option 1
+    assert "Option 1: **QuickShine Housekeeping**" in res
+    # 4. Strictly only morning slots for 2026-11-02
+    assert "2026-11-02T11:00" in res
+    assert "2026-11-03" not in res
+    assert "2026-11-04" not in res
+
+
+@pytest.mark.asyncio
+async def test_strict_slot_date_and_time_isolation(temp_memory_store, temp_tracer):
+    """Slots outside the requested date or time preference must be strictly excluded."""
+    api = MockProviderAPI()
+    agent = ErrandAgent(api=api, memory_manager=temp_memory_store, tracer=temp_tracer)
+
+    res = await agent.step("Book an electrician in Koramangala tomorrow morning")
+    assert "Option 1" in res
+    # Ensure all displayed slots are strictly 2026-11-02 in the morning
+    for line in res.splitlines():
+        if "Available slots:" in line:
+            slots_part = line.split("Available slots:")[1]
+            for slot_token in slots_part.split(","):
+                slot_token = slot_token.strip()
+                if "2026-" in slot_token:
+                    assert slot_token.startswith("2026-11-02")
+                    assert any(h in slot_token for h in ["T08", "T09", "T10", "T11"])

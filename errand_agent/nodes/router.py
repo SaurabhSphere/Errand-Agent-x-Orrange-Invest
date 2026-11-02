@@ -85,6 +85,48 @@ def _extract_intent_and_slots(user_text: str, current_state: ErrandState) -> dic
             "workflow_state": WorkflowState.IDLE.value,
         }
 
+    # 5b. Check for Platform Capabilities / What services do you offer?
+    if any(phrase in text for phrase in ["what services", "which services", "services you offer", "supported services", "what can you do", "help me with what"]):
+        return {
+            "intent": "inquiry_chat_support",
+            "inquiry_text": user_text,
+            "inquiry_answer": (
+                "Orange Invest specializes in 4 verified home-service categories:\n"
+                "• **Plumbing** (pipe repairs, taps, kitchen & bathroom fittings)\n"
+                "• **Electrical** (wiring, light bulbs, switches, circuit repairs)\n"
+                "• **AC Servicing** (deep cleaning, filter replacement, cooling checks)\n"
+                "• **Home Cleaning** (deep cleaning, housekeeping, dusting)\n\n"
+                "Which service would you like to arrange?"
+            ),
+            "workflow_state": WorkflowState.IDLE.value,
+        }
+
+    # 5c. Check for Unsupported / Out-of-Scope Services (e.g. driver, car driver, carpenter, painter, etc.)
+    unsupported_trades = {
+        "car drivers or transportation services": ["driver", "car driver", "chauffeur", "cab", "taxi", "car drive"],
+        "carpentry or woodwork services": ["carpenter", "carpentry", "woodwork", "furniture repair"],
+        "painting services": ["painter", "painting", "whitewash"],
+        "pest control services": ["pest control", "termites", "bedbugs", "cockroach"],
+        "gardening or landscaping services": ["gardener", "gardening", "landscaping", "lawn care"],
+        "cooking or chef services": ["cook", "chef", "cooking maid"],
+        "childcare or babysitting services": ["babysitter", "baby sitter", "childcare", "nanny"],
+        "appliance repairs outside AC servicing": ["refrigerator", "fridge repair", "washing machine", "tv repair", "microwave"],
+        "automotive or mechanic services": ["car repair", "car mechanic", "bike repair", "car wash"],
+    }
+    for desc, keywords in unsupported_trades.items():
+        if any(kw in text for kw in keywords):
+            return {
+                "intent": "inquiry_chat_support",
+                "inquiry_text": user_text,
+                "inquiry_answer": (
+                    f"I apologize, but Orange Invest currently does not offer {desc}. "
+                    "We specialize in verified home services for **plumbing**, **electrical work**, "
+                    "**AC servicing**, and **home cleaning**.\n\n"
+                    "Would you like me to help you arrange one of our supported home services instead?"
+                ),
+                "workflow_state": WorkflowState.IDLE.value,
+            }
+
     # 6. Direct inquiry on presented options (price of X, rating of X, specialty of X)
     if current_state.get("providers"):
         matched_p = None

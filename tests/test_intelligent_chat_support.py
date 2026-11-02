@@ -149,3 +149,30 @@ async def test_cleaning_service_request_returns_only_cleaners(temp_memory_store,
     assert 'Rajesh Kumar Plumbing' not in res
     assert 'Vikram Premium Plumbers' not in res
     assert 'Amit Electrical Works' not in res
+@pytest.mark.asyncio
+async def test_unsupported_service_driver_handled_gracefully_without_loop(temp_memory_store, temp_tracer):
+    """When a user asks for an unsupported service (e.g. driver), the agent must not enter a repetitive loop."""
+    api = MockProviderAPI()
+    agent = ErrandAgent(api=api, memory_manager=temp_memory_store, tracer=temp_tracer)
+
+    r1 = await agent.step("I'm looking for driver")
+    # Must explain platform scope and not repeat canned prompt
+    assert any(w in r1.lower() for w in ["driver", "transportation", "not offer", "not have", "currently", "specialize"])
+    assert "plumbing" in r1.lower() or "electrical" in r1.lower() or "cleaning" in r1.lower()
+    assert "could you please provide the service you need" not in r1.lower()
+
+    r2 = await agent.step("car driver")
+    assert any(w in r2.lower() for w in ["driver", "transportation", "not offer", "not have", "currently", "focuses"])
+    assert "could you please provide the service you need" not in r2.lower()
+
+
+@pytest.mark.asyncio
+async def test_platform_capabilities_inquiry(temp_memory_store, temp_tracer):
+    """User asking what services are offered gets a clear breakdown of supported categories."""
+    api = MockProviderAPI()
+    agent = ErrandAgent(api=api, memory_manager=temp_memory_store, tracer=temp_tracer)
+
+    res = await agent.step("what services do you offer?")
+    assert "plumbing" in res.lower()
+    assert "electrical" in res.lower()
+    assert "cleaning" in res.lower()

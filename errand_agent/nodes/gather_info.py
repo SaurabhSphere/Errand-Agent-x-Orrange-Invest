@@ -38,11 +38,19 @@ def gather_info(state: ErrandState, memory_manager: MemoryManager | None = None)
         missing_fields.append("your area/locality (e.g. Koramangala, Indiranagar)")
 
     if missing_fields:
-        prompt = (
-            "To find the best provider for you, could you please provide "
-            + " and ".join(missing_fields)
-            + "?"
-        )
+        prev_wstate = state.get("workflow_state")
+        if not service and prev_wstate == WorkflowState.GATHERING_INFO.value:
+            prompt = (
+                "I couldn't match your response to our available trades. "
+                "Our platform currently supports: **plumbing**, **electrician**, **AC servicing**, and **cleaning**.\n\n"
+                "Please let me know which of these 4 services you need help with."
+            )
+        else:
+            prompt = (
+                "To find the best provider for you, could you please provide "
+                + " and ".join(missing_fields)
+                + "?"
+            )
         return {
             **updates,
             "workflow_state": WorkflowState.GATHERING_INFO.value,

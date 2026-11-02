@@ -109,6 +109,65 @@ class ChatSupportEngine:
 
         return "\n".join(lines)
 
+    def route_and_reason(
+        self,
+        user_query: str,
+        state: ErrandState,
+        user_id: str = "user_default",
+    ) -> dict[str, Any] | None:
+        """Use LLM to perform deep intent classification, contradiction detection, and slot extraction."""
+        if not self.llm:
+            return None
+
+        # Build context
+        context_str = self.build_system_context(state, user_id=user_id)
+        current_providers = state.get("providers", [])
+        opt_summary = [
+            f"Option {i+1}: {p.get('name')} (ID: {p.get('id')}, Price: ₹{p.get('price')}, Rating: {p.get('rating')}★)"
+            for i, p in enumerate(current_providers)
+        ] if current_providers else ["None currently shown"]
+
+        system_instruction = (
+            "You are the intelligent intent router and reasoning engine for Orange Invest Home Services assistant.\n"
+            "Supported services: plumbing, electrician, ac_servicing, cleaning.\n\n"
+            "INTENT CLASSIFICATION RULES:\n"
+            "1. 'clarification': The user's requested trade contradicts the described task (e.g. asking for a plumber to fix light bulbs/switches/wiring, or electrician for leaking pipes/taps/toilets). Provide clarifying 'answer' asking if they want the correct trade.\n"
+            "2. 'search': The user expresses a need, desire, or request to find, book, hire, or arrange a home service (e.g. 'i need a plumber', 'find electrician in Koramangala', 'book ac servicing', 'looking for someone to fix shower'). Extract 'service' ('plumbing'|'electrician'|'ac_servicing'|'cleaning') and 'area'.\n"
+            "3. 'select_option': The user chooses an option number or provider name from presented options (e.g. '1', '2', 'Option 1', 'first one', 'book Rajesh', 'Anil'). Provide 1-based 'selected_option_index'.\n"
+            "4. 'inquiry': The user is asking a question or requesting information about a provider's price, rating, reviews, specialty, experience, slot availability, or policies (e.g. 'rating of anil', 'price of anil', 'is rajesh available at 9am?'). Provide helpful conversational 'answer'.\n"
+            "5. 'list_bookings': User asks to view active or past bookings ('my bookings', 'show bookings').\n"
+            "6. 'cancel': User wants to cancel an existing booking.\n"
+            "7. 'reschedule': User wants to reschedule or move an existing booking.\n"
+            "8. 'memory_view': User asks to see stored preferences ('my memory', 'show preferences').\n"
+            "9. 'memory_forget': User asks to forget a preference ('forget <key>').\n\n"
+            "Output a valid JSON object with the following keys:\n"
+            "- intent: 'clarification' | 'search' | 'select_option' | 'inquiry' | 'cancel' | 'reschedule' | 'list_bookings' | 'memory_view' | 'memory_forget'\n"
+            "- contradiction: boolean\n"
+            "- service: 'plumbing' | 'electrician' | 'ac_servicing' | 'cleaning' | null\n"
+            "- area: string or null (e.g. koramangala, indiranagar, etc.)\n"
+            "- budget_max: number or null\n"
+            "- time_preference: string or null\n"
+            "- selected_option_index: number or null\n"
+            "- answer: string or null (if intent is inquiry or clarification, provide a direct helpful conversational answer)\n\n"
+            f"Current options presented: {', '.join(opt_summary)}\n"
+            f"{context_str}"
+        )
+
+        try:
+            import json
+            from langchain_core.messages import SystemMessage, HumanMessage
+            response = self.llm.invoke([
+                SystemMessage(content=system_instruction),
+                HumanMessage(content=f"User Input: '{user_query}'"),
+            ])
+            content = response.content if hasattr(response, "content") else str(response)
+            json_match = re.search(r"\{.*\}", content, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group(0))
+        except Exception:
+            return None
+        return None
+
     def answer_inquiry(
         self,
         user_query: str,
@@ -219,8 +278,10 @@ class ChatSupportEngine:
                 slots_str = ", ".join(p_slots) if p_slots else "no slots currently open"
                 return f"**{p_name}** currently has the following slots available: {slots_str}."
 
-        # 4. Handle Price Negotiation or Discount Inquiry
-        if any(w in text for w in ["negotiable", "discount", "bargain", "cheaper", "lower", "reduce", "rate"]):
+        # 4. Handle Price Inquiry or Negotiation
+        if any(w in text for w in ["price", "cost", "charge", "fee", "rate", "negotiable", "discount", "bargain", "cheaper", "lower", "reduce"]):
+            if target_provider and any(w in text for w in ["price of", "cost of", "charge of", "rate of"]):
+                return f"The standard rate for **{target_provider['name']}** is **₹{target_provider.get('price')}**."
             cheapest = min(active_providers, key=lambda p: p.get("price", 99999))
             return (
                 f"All provider charges on our platform are fixed, standardized quotes backed by guaranteed service warranty.\n"
@@ -228,8 +289,8 @@ class ChatSupportEngine:
                 f"(Rating: {cheapest.get('rating')}★)."
             )
 
-        # 5. Handle Provider Specialty / Experience / Details Inquiry
-        if any(w in text for w in ["tell me about", "specialty", "experience", "who is", "rating", "details", "badge"]):
+        # 5. Handle Provider Specialty / Experience / Rating Details Inquiry
+        if any(w in text for w in ["rating", "stars", "tell me about", "specialty", "experience", "who is", "details", "badge"]):
             if target_provider:
                 p_id = target_provider.get("id")
                 details = self.api.get_provider(p_id) or target_provider
@@ -237,6 +298,8 @@ class ChatSupportEngine:
                 spec = attrs.get("specialty", "Standard home services")
                 exp = attrs.get("experience_years", "Verified")
                 badge = attrs.get("badge", "Top Rated")
+                if "rating" in text or "stars" in text:
+                    return f"**{details.get('name')}** has a rating of **{details.get('rating')}★** [{badge}] with {exp} years of experience."
                 return (
                     f"**{details.get('name')}** has **{exp} years** of experience ({badge}) with a **{details.get('rating')}★** rating.\n"
                     f"• Specialty: {spec}\n"

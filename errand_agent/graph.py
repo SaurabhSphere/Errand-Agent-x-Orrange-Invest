@@ -38,7 +38,7 @@ def build_errand_graph(
 
     # 1. Define Node Functions (injecting dependencies)
     def node_route_intent(state: ErrandState) -> dict[str, Any]:
-        return route_intent(state)
+        return route_intent(state, chat_engine=chat_engine)
 
     def node_gather_info(state: ErrandState) -> dict[str, Any]:
         return gather_info(state, memory_manager=memory_manager)
@@ -180,7 +180,10 @@ def build_errand_graph(
         user_text = last_msg.content if hasattr(last_msg, "content") else str(last_msg)
         user_id = state.get("user_id", "user_default")
 
-        if chat_engine:
+        # If answer was already generated during routing, use it directly!
+        if state.get("inquiry_answer"):
+            answer = state["inquiry_answer"]
+        elif chat_engine:
             answer = chat_engine.answer_inquiry(user_text, state, user_id=user_id)
         else:
             answer = "I can assist you with provider details, availability, and bookings. How can I help?"

@@ -77,6 +77,40 @@ async def test_customer_reviews_inquiry_sanitized(temp_memory_store, temp_tracer
 
 
 @pytest.mark.asyncio
+async def test_trade_task_contradiction_detected(temp_memory_store, temp_tracer):
+    api = MockProviderAPI()
+    agent = ErrandAgent(api=api, memory_manager=temp_memory_store, tracer=temp_tracer)
+
+    # User asks for a plumber to fix light bulb
+    res = await agent.step("i need plumber to fix my light bulb")
+    assert "electrician" in res.lower()
+    assert "light bulb" in res.lower() or "electrical" in res.lower()
+
+
+@pytest.mark.asyncio
+async def test_option_attribute_inquiries_preserve_options(temp_memory_store, temp_tracer):
+    api = MockProviderAPI()
+    agent = ErrandAgent(api=api, memory_manager=temp_memory_store, tracer=temp_tracer)
+
+    await agent.step("I need a plumber in Koramangala")
+
+    # 1. Ask rating of Anil
+    r_rating = await agent.step("rating of anil")
+    assert "4.6" in r_rating
+    assert "Anil" in r_rating
+
+    # 2. Ask price of Anil
+    r_price = await agent.step("price of anil")
+    assert "1400" in r_price or "Anil" in r_price
+
+    # 3. Direct option selection still works without re-searching!
+    r_select = await agent.step("2")
+    assert "Please confirm your booking details" in r_select
+    assert "Anil Emergency Plumbing" in r_select
+    assert "1400" in r_select
+
+
+@pytest.mark.asyncio
 async def test_approval_gate_preserved_after_chat_support_inquiries(temp_memory_store, temp_tracer):
     api = MockProviderAPI()
     agent = ErrandAgent(api=api, memory_manager=temp_memory_store, tracer=temp_tracer)

@@ -63,7 +63,90 @@ def _extract_intent_and_slots(user_text: str, current_state: ErrandState) -> dic
             "workflow_state": WorkflowState.RESCHEDULING.value,
         }
 
-    # 5. Service extraction
+    # 5. Check for Trade / Task Contradictions (e.g. plumber for light bulb, electrician for tap leak)
+    if "plumb" in text and any(w in text for w in ["light", "bulb", "switch", "wiring", "socket", "fuse"]):
+        return {
+            "intent": "inquiry_chat_support",
+            "inquiry_text": user_text,
+            "inquiry_answer": (
+                "It looks like you need help with electrical work (fixing a light bulb), which is typically done by an "
+                "electrician rather than a plumber. Would you like me to find an electrician for you?"
+            ),
+            "workflow_state": WorkflowState.IDLE.value,
+        }
+    if "electr" in text and any(w in text for w in ["tap", "pipe", "leak", "toilet", "sink", "drain"]):
+        return {
+            "intent": "inquiry_chat_support",
+            "inquiry_text": user_text,
+            "inquiry_answer": (
+                "It sounds like you have a plumbing issue (leaking pipe/tap), which is typically handled by a "
+                "plumber rather than an electrician. Would you like me to find a plumber for you?"
+            ),
+            "workflow_state": WorkflowState.IDLE.value,
+        }
+
+    # 6. Direct inquiry on presented options (price of X, rating of X, specialty of X)
+    if current_state.get("providers"):
+        matched_p = None
+        for p in current_state.get("providers", []):
+            p_name = p.get("name", "").lower()
+            p_id = p.get("id", "").lower()
+            if any(part in text for part in p_name.split() if len(part) > 2) or p_id in text:
+                matched_p = p
+                break
+
+        if matched_p:
+            if any(w in text for w in ["price", "cost", "charge", "fee", "rate", "how much"]):
+                return {
+                    "intent": "inquiry_chat_support",
+                    "inquiry_text": user_text,
+                    "inquiry_provider": matched_p,
+                    "inquiry_answer": f"The standard rate for **{matched_p.get('name')}** is **₹{matched_p.get('price')}**.",
+                    "workflow_state": WorkflowState.PRESENTING_OPTIONS.value,
+                }
+            if any(w in text for w in ["rating", "stars", "score"]):
+                badge = matched_p.get("attributes", {}).get("badge", "Verified")
+                return {
+                    "intent": "inquiry_chat_support",
+                    "inquiry_text": user_text,
+                    "inquiry_provider": matched_p,
+                    "inquiry_answer": f"**{matched_p.get('name')}** has a rating of **{matched_p.get('rating')}★** [{badge}].",
+                    "workflow_state": WorkflowState.PRESENTING_OPTIONS.value,
+                }
+
+    # 7. Check for general inquiries, availability checks, or questions
+    inquiry_keywords = [
+        "available", "availability", "free slot", "open slot", "free slots",
+        "negotiable", "discount", "bargain", "cheaper", "lower", "reduce",
+        "tell me about", "reviews", "review", "rating", "experience", "specialty",
+        "who is", "what is", "why is", "how much", "cost", "charge", "price",
+    ]
+    is_question = (
+        "?" in text
+        or text.startswith(("is ", "are ", "can ", "could ", "will ", "would ", "does ", "do ", "what ", "who ", "why ", "when ", "how "))
+    )
+    is_command = any(text.startswith(cmd) for cmd in ["my ", "book ", "i need", "i want", "find ", "option", "yes", "no"])
+
+    if (any(k in text for k in inquiry_keywords) or is_question) and not is_command:
+        asked_p = None
+        for p in current_state.get("providers", []):
+            p_name = p.get("name", "").lower()
+            p_id = p.get("id", "").lower()
+            if any(part in text for part in p_name.split() if len(part) > 2) or p_id in text:
+                asked_p = p
+                break
+        return {
+            "intent": "inquiry_chat_support",
+            "inquiry_text": user_text,
+            "inquiry_provider": asked_p,
+            "workflow_state": (
+                WorkflowState.PRESENTING_OPTIONS.value
+                if current_state.get("providers")
+                else WorkflowState.IDLE.value
+            ),
+        }
+
+    # 8. Service extraction
     if "plumb" in text or "tap" in text or "leak" in text or "pipe" in text or "sink" in text:
         updates["service"] = "plumbing"
     elif "electr" in text or "wiring" in text or "switch" in text or "fan" in text or "light" in text:
@@ -73,12 +156,12 @@ def _extract_intent_and_slots(user_text: str, current_state: ErrandState) -> dic
     elif "clean" in text or "housekeeping" in text:
         updates["service"] = "cleaning"
 
-    # 6. Area extraction
+    # 9. Area extraction
     for area in ["koramangala", "indiranagar", "hsr_layout", "whitefield", "jayanagar", "bellandur"]:
         if area.replace("_", " ") in text or area in text:
             updates["area"] = area
 
-    # 7. Budget extraction (e.g. "under ₹1500", "under 1500", "below 1,200", "budget 2000")
+    # 10. Budget extraction (e.g. "under ₹1500", "under 1500", "below 1,200", "budget 2000")
     budget_match = re.search(r"(?:under|below|max|budget|within|up to)\s*(?:₹|rs\.?|inr)?\s*([0-9,]+)", text)
     if budget_match:
         try:
@@ -86,7 +169,7 @@ def _extract_intent_and_slots(user_text: str, current_state: ErrandState) -> dic
         except ValueError:
             pass
 
-    # 8. Time preference extraction
+    # 11. Time preference extraction
     if "morning" in text:
         updates["time_preference"] = "morning"
     elif "afternoon" in text:
@@ -94,12 +177,11 @@ def _extract_intent_and_slots(user_text: str, current_state: ErrandState) -> dic
     elif "evening" in text:
         updates["time_preference"] = "evening"
 
-    # Specific time window like "not before 10 a.m."
     not_before_match = re.search(r"not before\s*(\d{1,2})\s*(?:a\.?m\.?|am)?", text)
     if not_before_match:
         updates["time_preference"] = f"after_{not_before_match.group(1)}am"
 
-    # 9. Provider preference (e.g. "same electrician as last time", "book rajesh")
+    # 12. Provider preference
     if "same" in text and ("last time" in text or "previous" in text):
         updates["prefer_previous_provider"] = True
     elif "rajesh" in text:
@@ -109,7 +191,7 @@ def _extract_intent_and_slots(user_text: str, current_state: ErrandState) -> dic
     elif "suresh" in text:
         updates["preferred_provider_id"] = "plumber-suresh-02"
 
-    # 10. Date range
+    # 13. Date range
     if "this week" in text:
         updates["date_range_start"] = "2026-11-02"
         updates["date_range_end"] = "2026-11-08"
@@ -117,7 +199,7 @@ def _extract_intent_and_slots(user_text: str, current_state: ErrandState) -> dic
         updates["date_range_start"] = "2026-11-02"
         updates["date_range_end"] = "2026-11-02"
 
-    # Selection of option from presented list: "option 1", "book option 2", "1", "first one"
+    # 14. Selection of option from presented list: "option 1", "book option 2", "1", "first one"
     selection_match = re.search(r"\b(?:option|number|#)?\s*([1-8])\b", text)
     if selection_match and current_state.get("providers"):
         opt_idx = int(selection_match.group(1)) - 1
@@ -138,43 +220,11 @@ def _extract_intent_and_slots(user_text: str, current_state: ErrandState) -> dic
             "workflow_state": WorkflowState.PRESENTING_OPTIONS.value,
         }
 
-    # Check for inquiries, questions, or availability checks (Chat Support)
-    inquiry_keywords = [
-        "available", "availability", "free slot", "open slot", "free slots",
-        "negotiable", "discount", "bargain", "cheaper", "lower", "reduce",
-        "tell me about", "reviews", "review", "rating", "experience", "specialty",
-        "who is", "what is", "why is", "how much", "cost", "charge",
-    ]
-    is_question = (
-        "?" in text
-        or text.startswith(("is ", "are ", "can ", "could ", "will ", "would ", "does ", "do ", "what ", "who ", "why ", "when ", "how "))
-    )
-    is_command = any(text.startswith(cmd) for cmd in ["my ", "book ", "i need", "i want", "find ", "option", "yes", "no"])
-    
-    if (any(k in text for k in inquiry_keywords) or is_question) and not is_command:
-        asked_p = None
-        for p in current_state.get("providers", []):
-            p_name = p.get("name", "").lower()
-            p_id = p.get("id", "").lower()
-            if any(part in text for part in p_name.split() if len(part) > 2) or p_id in text:
-                asked_p = p
-                break
-        return {
-            "intent": "inquiry_chat_support",
-            "inquiry_text": user_text,
-            "inquiry_provider": asked_p,
-            "workflow_state": (
-                WorkflowState.PRESENTING_OPTIONS.value
-                if current_state.get("providers")
-                else WorkflowState.IDLE.value
-            ),
-        }
-
     updates["intent"] = "book"
     return updates
 
 
-def route_intent(state: ErrandState) -> dict[str, Any]:
+def route_intent(state: ErrandState, chat_engine: Any | None = None) -> dict[str, Any]:
     """Inspect latest message, extract slots, update state while preserving known facts."""
     messages = state.get("messages", [])
     if not messages:
@@ -182,11 +232,17 @@ def route_intent(state: ErrandState) -> dict[str, Any]:
 
     last_msg = messages[-1]
     user_text = last_msg.content if hasattr(last_msg, "content") else str(last_msg)
+    user_id = state.get("user_id", "user_default")
 
-    # Increment model/turn counter
     turn_count = state.get("model_turn_count", 0) + 1
 
     extracted = _extract_intent_and_slots(user_text, state)
+
+    # If user asked an inquiry and live LLM is active, enhance the answer with live LLM intelligence!
+    if extracted.get("intent") == "inquiry_chat_support" and chat_engine and chat_engine.is_llm_active():
+        llm_answer = chat_engine.answer_inquiry(user_text, state, user_id=user_id)
+        if llm_answer:
+            extracted["inquiry_answer"] = llm_answer
 
     # Preserve all existing slots unless explicitly updated (Must-Have 1)
     combined: dict[str, Any] = {
@@ -200,7 +256,7 @@ def route_intent(state: ErrandState) -> dict[str, Any]:
         "time_preference", "budget_max", "preferred_provider_id",
         "selected_provider_id", "selected_provider", "selected_slot",
         "target_booking_id", "new_reschedule_slot", "current_action",
-        "providers", "inquiry_text", "inquiry_provider"
+        "providers", "inquiry_text", "inquiry_provider", "inquiry_answer",
     ]:
         if field in extracted:
             combined[field] = extracted[field]

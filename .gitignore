@@ -28,7 +28,8 @@ ENV/
 
 # Data & Persistence
 data/
-traces/
+traces/*.jsonl
+!traces/trace-timeout-after-success-demo.jsonl
 *.db
 *.sqlite
 *.sqlite3

@@ -123,6 +123,56 @@ def build_errand_graph(
             msg = "Memory manager is not available."
         return {"workflow_state": WorkflowState.IDLE.value, "messages": [AIMessage(content=msg)]}
 
+    def node_inquiry_pricing(state: ErrandState) -> dict[str, Any]:
+        providers = state.get("providers", [])
+        lines = [
+            "All rates listed by our verified home-service partners are fixed, standardized platform quotes with full service warranty and quality guarantee, so they are not negotiable."
+        ]
+        if providers:
+            cheapest = min(providers, key=lambda p: p.get("price", 99999))
+            lines.append(
+                f"\nIf you are looking for the most economical option, **{cheapest['name']}** is available at **₹{cheapest['price']}**."
+            )
+            lines.append("\nPlease reply with the option number you would like to proceed with (e.g. 'Option 1' or 'Option 3').")
+        return {
+            "workflow_state": WorkflowState.PRESENTING_OPTIONS.value,
+            "messages": [AIMessage(content="\n".join(lines))],
+        }
+
+    def node_invalid_selection(state: ErrandState) -> dict[str, Any]:
+        providers = state.get("providers", [])
+        max_opt = len(providers) if providers else 3
+        msg = f"Option 0 is not a valid choice. Please choose between Option 1 and Option {max_opt}, or type 'cancel' to exit."
+        return {
+            "workflow_state": WorkflowState.PRESENTING_OPTIONS.value,
+            "messages": [AIMessage(content=msg)],
+        }
+
+    def node_inquiry_provider(state: ErrandState) -> dict[str, Any]:
+        p = state.get("inquiry_provider") or (state.get("providers", [])[0] if state.get("providers") else None)
+        if not p:
+            return {"messages": [AIMessage(content="Could not find details for that provider.")]}
+
+        p_id = p.get("id")
+        details = api.get_provider(p_id) if api else p
+        attrs = details.get("attributes", {})
+        spec = attrs.get("specialty", "General home services")
+        exp = attrs.get("experience_years", "Experienced")
+        badge = attrs.get("badge", "Verified")
+
+        msg = (
+            f"Here are the details for **{details.get('name', p_id)}**:\n"
+            f"• Rating: **{details.get('rating', 'N/A')}★** [{badge}]\n"
+            f"• Standard Rate: **₹{details.get('price', 'N/A')}**\n"
+            f"• Experience: **{exp} years**\n"
+            f"• Specialty: {spec}\n\n"
+            f"Would you like to select this provider? (Reply with the option number, e.g. 'Option 1')"
+        )
+        return {
+            "workflow_state": WorkflowState.PRESENTING_OPTIONS.value,
+            "messages": [AIMessage(content=msg)],
+        }
+
     # 2. Add nodes to graph
     builder.add_node("route_intent", node_route_intent)
     builder.add_node("gather_info", node_gather_info)
@@ -137,13 +187,17 @@ def build_errand_graph(
     builder.add_node("list_bookings", node_list_bookings)
     builder.add_node("memory_view", node_memory_view)
     builder.add_node("memory_forget", node_memory_forget)
+    builder.add_node("inquiry_pricing", node_inquiry_pricing)
+    builder.add_node("invalid_selection", node_invalid_selection)
+    builder.add_node("inquiry_provider", node_inquiry_provider)
 
     # 3. Add Edges & Conditional Routing
     builder.add_edge(START, "route_intent")
 
     def route_after_intent(state: ErrandState) -> Literal[
         "gather_info", "hold_slot", "await_approval",
-        "list_bookings", "memory_view", "memory_forget"
+        "list_bookings", "memory_view", "memory_forget",
+        "inquiry_pricing", "invalid_selection", "inquiry_provider"
     ]:
         intent = state.get("intent")
         if intent == "memory_view":
@@ -156,6 +210,12 @@ def build_errand_graph(
             return "await_approval"
         elif intent == "select_provider":
             return "hold_slot"
+        elif intent == "inquiry_pricing":
+            return "inquiry_pricing"
+        elif intent == "invalid_selection":
+            return "invalid_selection"
+        elif intent == "inquiry_provider":
+            return "inquiry_provider"
         return "gather_info"
 
     builder.add_conditional_edges("route_intent", route_after_intent)
@@ -226,6 +286,9 @@ def build_errand_graph(
     builder.add_edge("list_bookings", END)
     builder.add_edge("memory_view", END)
     builder.add_edge("memory_forget", END)
+    builder.add_edge("inquiry_pricing", END)
+    builder.add_edge("invalid_selection", END)
+    builder.add_edge("inquiry_provider", END)
 
     # 4. Compile with checkpointer and human-in-the-loop interrupts (MUST-HAVE 2)
     checkpointer_inst = checkpointer or MemorySaver()

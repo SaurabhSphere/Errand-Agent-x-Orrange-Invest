@@ -33,14 +33,14 @@ class JEVGuardrail:
 
     # Adversarial patterns for fallback detection
     JAILBREAK_PATTERNS = [
-        re.compile(r"ignore\s+(all\s+)?(previous|prior)\s+instructions", re.IGNORECASE),
+        re.compile(r"ignore\s+(all\s+)?(previous|prior)\s+(instructions|command|commands|rules|prompts|directives)", re.IGNORECASE),
         re.compile(r"system\s*override", re.IGNORECASE),
-        re.compile(r"you\s+are\s+now\s+(in\s+)?(a\s+)?(debug|admin|superuser|dan|developer)\s+mode", re.IGNORECASE),
+        re.compile(r"you\s+are\s+now\s+(in\s+)?(a\s+)?(debug|admin|superuser|dan|developer|engineer)", re.IGNORECASE),
         re.compile(r"dan\s+mode", re.IGNORECASE),
         re.compile(r"jailbreak", re.IGNORECASE),
-        re.compile(r"disregard\s+(all\s+)?guidelines", re.IGNORECASE),
+        re.compile(r"disregard\s+(all\s+)?(guidelines|instructions|commands|rules)", re.IGNORECASE),
         re.compile(r"do\s+anything\s+now", re.IGNORECASE),
-        re.compile(r"reveal\s+(your\s+)?(system\s+prompt|hidden\s+instructions)", re.IGNORECASE),
+        re.compile(r"(reveal|give|print|show|output)\s+(me\s+)?(the\s+|your\s+)?(system\s+prompt|hidden\s+instructions|prompt)", re.IGNORECASE),
         re.compile(r"bypass\s+(all\s+)?(safety|approval|checks)", re.IGNORECASE),
         re.compile(r"sudo\s+mode", re.IGNORECASE),
         re.compile(r"automatically\s+approve", re.IGNORECASE),

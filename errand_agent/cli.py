@@ -19,6 +19,7 @@ Quick Commands:
   • "my bookings"        - View active & past bookings
   • "my memory"          - View persistent preferences
   • "forget <key>"       - Erase a stored preference permanently
+  • "reset"              - Start a fresh errand session
   • "status"             - View current session info & trace location
   • "quit" or "exit"     - Exit the session
 ======================================================================

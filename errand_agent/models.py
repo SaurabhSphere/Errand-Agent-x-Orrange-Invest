@@ -117,9 +117,23 @@ class ExecutionLimits(BaseModel):
     current_model_turns: int = 0
     current_tool_calls: int = 0
     start_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_active_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def reset(self) -> None:
+        """Reset execution limits and timers for a fresh errand session."""
+        now = datetime.now(timezone.utc)
+        self.current_model_turns = 0
+        self.current_tool_calls = 0
+        self.start_time = now
+        self.last_active_time = now
+
+    def touch(self) -> None:
+        """Update last active time."""
+        self.last_active_time = datetime.now(timezone.utc)
 
     def check_limits(self) -> tuple[bool, str | None]:
-        elapsed = (datetime.now(timezone.utc) - self.start_time).total_seconds()
+        now = datetime.now(timezone.utc)
+        elapsed = (now - self.start_time).total_seconds()
         if self.current_model_turns >= self.max_model_turns:
             return False, f"Max model turns ({self.max_model_turns}) exceeded"
         if self.current_tool_calls >= self.max_tool_calls:

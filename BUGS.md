@@ -49,3 +49,24 @@ This document details three real bugs encountered during implementation, their r
   This guarantees that running `python tests/eval_report.py` directly executes without dependency or import errors.
 * **Regression test**:
   Verified by executing `python tests/eval_report.py` directly in the shell.
+
+---
+
+### Bug 4: Interactive Session Wall-Clock Lockout and Jailbreak Masking
+
+* **What broke**:
+  During multi-turn interactive CLI usage, once 120 seconds of real-world human reading/thinking elapsed across turns, the agent locked out all subsequent user prompts with:
+  `⚠️ Execution Limit Reached: Max wall-clock time (120.0s) exceeded.`
+  Furthermore, jailbreak attacks submitted by the user while the session was timed out were blocked by the wall-clock limit check instead of being audited and caught by the JEV guardrail.
+* **Why**:
+  1. The wall-clock limit tracker (`ExecutionLimits.start_time`) tracked elapsed time from CLI launch rather than backend execution duration per turn, penalizing human latency between typed inputs.
+  2. The interactive loop had no command or automatic reset path to start a fresh errand session after hitting the limit without restarting the entire process.
+  3. The agent turn handler evaluated `check_limits()` before `jev_guardrail.screen_input()`, causing malicious jailbreak prompts submitted to a timed-out session to be swallowed by limit exhaustion rather than flagged and audited as security events.
+* **The fix**:
+  1. Made security screening (`screen_input`) run at Step 0 before limit checks so adversarial inputs are always audited as security events regardless of session state.
+  2. Implemented `ErrandAgent.reset_session()` and `ExecutionLimits.reset()` to allow resetting execution limits and workflow state.
+  3. Added an explicit `"reset"` command in the interactive CLI, and updated the limit exhaustion prompt to guide the user to type `"reset"`.
+  4. Added dedicated conversational inquiry routing (`inquiry_pricing`, `invalid_selection`, `inquiry_provider`) to handle pricing negotiation inquiries and invalid option selections gracefully without repeated provider searches.
+* **Regression test**:
+  `tests/test_conversational_resilience.py::test_session_recovery_after_timeout` and `tests/test_conversational_resilience.py::test_guardrail_evaluated_before_limits`.
+

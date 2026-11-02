@@ -131,6 +131,37 @@ def _extract_intent_and_slots(user_text: str, current_state: ErrandState) -> dic
             updates["workflow_state"] = WorkflowState.HOLDING_SLOT.value
             return updates
 
+    # Check for invalid option selection (e.g. "0", "option 0")
+    if current_state.get("providers") and (text.strip() == "0" or "option 0" in text):
+        return {
+            "intent": "invalid_selection",
+            "workflow_state": WorkflowState.PRESENTING_OPTIONS.value,
+        }
+
+    # Check for questions about pricing/negotiability/discounts when options are presented
+    if current_state.get("providers") and any(w in text for w in ["negotiable", "discount", "bargain", "cheaper", "lower", "reduce"]):
+        return {
+            "intent": "inquiry_pricing",
+            "inquiry_text": user_text,
+            "workflow_state": WorkflowState.PRESENTING_OPTIONS.value,
+        }
+
+    # Check for inquiries about specific provider details or reviews
+    if current_state.get("providers") and any(w in text for w in ["tell me about", "reviews", "rating", "experience", "who is"]):
+        asked_p = None
+        for p in current_state.get("providers", []):
+            p_name = p.get("name", "").lower()
+            p_id = p.get("id", "").lower()
+            if any(part in text for part in p_name.split() if len(part) > 2) or p_id in text:
+                asked_p = p
+                break
+        return {
+            "intent": "inquiry_provider",
+            "inquiry_provider": asked_p or current_state.get("providers", [])[0],
+            "inquiry_text": user_text,
+            "workflow_state": WorkflowState.PRESENTING_OPTIONS.value,
+        }
+
     updates["intent"] = "book"
     return updates
 
@@ -160,7 +191,8 @@ def route_intent(state: ErrandState) -> dict[str, Any]:
         "service", "area", "date_range_start", "date_range_end",
         "time_preference", "budget_max", "preferred_provider_id",
         "selected_provider_id", "selected_provider", "selected_slot",
-        "target_booking_id", "new_reschedule_slot", "current_action"
+        "target_booking_id", "new_reschedule_slot", "current_action",
+        "providers", "inquiry_text", "inquiry_provider"
     ]:
         if field in extracted:
             combined[field] = extracted[field]

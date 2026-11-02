@@ -9,7 +9,7 @@ from langgraph.graph import END, START, StateGraph
 from mcp_server.provider_api import MockProviderAPI
 from errand_agent.approval import ApprovalController
 from errand_agent.memory import MemoryManager
-from errand_agent.models import WorkflowState
+from errand_agent.models import ActionType, WorkflowState
 from errand_agent.nodes.await_approval import await_approval_node
 from errand_agent.nodes.execute_booking import execute_booking_node
 from errand_agent.nodes.execute_cancel import execute_cancel_node
@@ -183,7 +183,23 @@ def build_errand_graph(
         "present_options": "present_options",
     })
 
-    builder.add_edge("await_approval", END)
+    # Route from await_approval to the appropriate action node
+    # The interrupt_before will pause execution right before entering this node!
+    def route_after_approval(state: ErrandState) -> Literal[
+        "execute_booking", "execute_cancel", "execute_reschedule"
+    ]:
+        action = state.get("current_action", "book")
+        if action == "cancel":
+            return "execute_cancel"
+        elif action == "reschedule":
+            return "execute_reschedule"
+        return "execute_booking"
+
+    builder.add_conditional_edges("await_approval", route_after_approval, {
+        "execute_booking": "execute_booking",
+        "execute_cancel": "execute_cancel",
+        "execute_reschedule": "execute_reschedule",
+    })
 
     def route_after_booking(state: ErrandState) -> Literal[
         "verify_booking", "present_options", "hold_slot", "__end__"

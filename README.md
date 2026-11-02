@@ -29,10 +29,10 @@ pytest tests/ -v
 1. **Explicit Workflow State**: Modeled as a LangGraph `StateGraph`. Asks *only* for missing information; corrections to one detail preserve all other gathered fields.
 2. **Approval Enforced by Code**: `interrupt_before=["execute_booking", "execute_cancel", "execute_reschedule"]` halts execution. The code-level `ApprovalController` verifies exact match of provider, slot, and price before any action executes. Any change voids approval.
 3. **Booking Correctness**: Idempotency keys prevent double-booking across repeated "yes" inputs. On booking timeouts, the agent queries authoritative `get_booking_status` before reporting. First cancellation attempt 503 is automatically retried.
-4. **Untrusted Tool Output**: Reviews are treated as data, passed through `Sanitizer`, and framed as untrusted quotes. Injected prompt instructions cannot alter permissions or bypass approval.
+4. **Untrusted Tool Output & JEV Guardrail**: Integrated with **TypeSafe AI's Jev** System One classifier (`JEVGuardrail`) to screen incoming prompts and untrusted tool outputs against jailbreak, instruction override, or persona manipulation attacks. Configured via `.env` (`JEV_API_KEY`).
 5. **Bounded Execution**: Hard caps enforced by `ExecutionLimits` (max model turns, tool calls, and wall-clock time) with graceful degradation.
 6. **Cross-Session Memory**: `MemoryManager` records facts with provenance (`user_stated` vs `agent_inferred`). Inferred facts require confirmation; forgotten facts are permanently tombstoned.
-7. **Traces**: Every session records a JSONL trace in `traces/` tracking state transitions, model turns, tool calls, and scrubbed secrets.
+7. **Traces**: Every session records a JSONL trace in `traces/` tracking state transitions, model turns, tool calls, guardrail events, and scrubbed secrets.
 8. **18 Automated Evals**: Deterministic offline test suite asserting invariants across all failure modes and requirements.
 
 ---
